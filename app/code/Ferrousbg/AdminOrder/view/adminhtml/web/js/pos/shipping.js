@@ -113,12 +113,16 @@ define([
                     success: (res) => {
                         let raw = res.addresses || [];
                         let foundDefault = null;
+                        let foundDefaultBilling = null;
 
                         let filteredList = raw.map(addr => {
                             let isDefShipping = (addr.default_shipping == 1 || addr.default_shipping === true);
                             let isDefBilling = (addr.default_billing == 1 || addr.default_billing === true);
 
-                            if (isDefBilling && !isDefShipping) return null;
+                            // Track default billing for auto-selection
+                            if (isDefBilling) {
+                                foundDefaultBilling = addr.id;
+                            }
 
                             // 1. Извличане на данни
                             let fullString = Array.isArray(addr.street) ? addr.street.join(' ') : (addr.street || '');
@@ -154,7 +158,8 @@ define([
                                 _clean_street: cleanStreet,
                                 note: note,
                                 is_office: isOff,
-                                default_shipping: isDefShipping
+                                default_shipping: isDefShipping,
+                                default_billing: isDefBilling
                             };
 
                             if (isDefShipping) foundDefault = formatted;
@@ -162,6 +167,11 @@ define([
                         }).filter(item => item !== null);
 
                         this.savedAddresses = filteredList;
+
+                        // Auto-set billing address if not already set
+                        if (!this.billingAddressId && foundDefaultBilling) {
+                            this.billingAddressId = foundDefaultBilling;
+                        }
 
                         if (foundDefault) {
                             this.applySavedAddress(foundDefault, false); // Тук false затваря панела при зареждане (желано)

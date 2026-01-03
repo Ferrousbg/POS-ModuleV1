@@ -44,18 +44,41 @@
 
     <!-- Totals & Actions -->
     <div class="mt-4 pt-6 border-t border-slate-100 bg-white">
+        <!-- Mode Selector -->
+        <div class="mb-4 flex gap-2">
+            <button @click="submitMode = 'request'"
+                    :class="submitMode === 'request' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                    class="flex-1 py-3 px-4 rounded-lg font-bold text-sm transition">
+                📋 Request
+            </button>
+            <button @click="submitMode = 'order'"
+                    :class="submitMode === 'order' ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                    class="flex-1 py-3 px-4 rounded-lg font-bold text-sm transition">
+                🚀 Order
+            </button>
+        </div>
+
         <div class="flex justify-between items-end mb-6">
             <span class="text-xl font-bold text-slate-500">Total Amount:</span>
             <span class="text-5xl font-black text-slate-800" x-text="formatPrice(grandTotal)"></span>
         </div>
 
-        <!-- MAIN ACTION BUTTON: GREEN (Standard for GO) or ORANGE?
-             Let's use a very deep Orange/Red for action to fit the theme -->
+        <!-- MAIN ACTION BUTTON -->
         <button @click="placeOrder()"
                 :disabled="!isValidOrder"
-                :class="{'opacity-50 cursor-not-allowed bg-slate-300': !isValidOrder, 'bg-orange-600 hover:bg-orange-700 shadow-xl shadow-orange-600/30 transform active:scale-[0.99]': isValidOrder}"
+                :class="{
+                    'opacity-50 cursor-not-allowed bg-slate-300': !isValidOrder, 
+                    'bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-600/30': isValidOrder && submitMode === 'request',
+                    'bg-orange-600 hover:bg-orange-700 shadow-xl shadow-orange-600/30': isValidOrder && submitMode === 'order',
+                    'transform active:scale-[0.99]': isValidOrder
+                }"
                 class="w-full text-white font-black py-5 rounded-2xl transition text-2xl flex justify-center items-center gap-3">
-            <span x-show="!placingOrder">🚀 Complete Order</span>
+            <template x-if="submitMode === 'request'">
+                <span x-show="!placingOrder">📋 Submit Request</span>
+            </template>
+            <template x-if="submitMode === 'order'">
+                <span x-show="!placingOrder">🚀 Complete Order</span>
+            </template>
             <span x-show="placingOrder" class="flex items-center gap-2">Processing...</span>
         </button>
 
