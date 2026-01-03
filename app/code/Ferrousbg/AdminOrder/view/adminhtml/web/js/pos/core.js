@@ -201,8 +201,9 @@ define([
                 };
 
                 // Add billing address for requests
+                // Note: billingAddressId is already validated in placeOrder()
                 if (this.submitMode === 'request') {
-                    payload.billing_address_id = this.billingAddressId || (this.customer && this.customer.default_billing);
+                    payload.billing_address_id = this.billingAddressId;
                     payload.shipping_address_id = this.address.id || null;
                 }
 

@@ -8,6 +8,7 @@ use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\AddressRepositoryInterface;
+use Magento\Framework\Stdlib\DateTime\DateTime;
 
 class Create extends Action
 {
@@ -16,6 +17,7 @@ class Create extends Action
     protected $resourceConnection;
     protected $customerRepository;
     protected $addressRepository;
+    protected $dateTime;
 
     public function __construct(
         Context $context,
@@ -23,7 +25,8 @@ class Create extends Action
         ProductRepositoryInterface $productRepository,
         ResourceConnection $resourceConnection,
         CustomerRepositoryInterface $customerRepository,
-        AddressRepositoryInterface $addressRepository
+        AddressRepositoryInterface $addressRepository,
+        DateTime $dateTime
     ) {
         parent::__construct($context);
         $this->jsonFactory = $jsonFactory;
@@ -31,6 +34,7 @@ class Create extends Action
         $this->resourceConnection = $resourceConnection;
         $this->customerRepository = $customerRepository;
         $this->addressRepository = $addressRepository;
+        $this->dateTime = $dateTime;
     }
 
     public function execute()
@@ -88,6 +92,7 @@ class Create extends Action
             $connection = $this->resourceConnection->getConnection();
             
             // Insert into mgwf_ferrous_request table
+            $currentTime = $this->dateTime->gmtDate();
             $requestData = [
                 'customer_id' => $customerId,
                 'store_id' => $storeId,
@@ -96,8 +101,8 @@ class Create extends Action
                 'shipping_method' => $shippingMethod,
                 'billing_customer_address_id' => $billingAddressId,
                 'shipping_customer_address_id' => $shippingAddressId,
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s')
+                'created_at' => $currentTime,
+                'updated_at' => $currentTime
             ];
             
             $connection->insert(
@@ -107,13 +112,26 @@ class Create extends Action
             
             $requestId = $connection->lastInsertId();
 
+            // Load all products at once to avoid N+1 queries
+            $productIds = array_column($data['items'], 'id');
+            $products = [];
+            foreach ($productIds as $productId) {
+                try {
+                    $products[$productId] = $this->productRepository->getById($productId);
+                } catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
+                    return $result->setData([
+                        'success' => false, 
+                        'message' => 'Product with ID ' . $productId . ' not found.'
+                    ]);
+                }
+            }
+
             // Insert items into mgwf_ferrous_request_item table
             foreach ($data['items'] as $item) {
                 $productId = (int)$item['id'];
                 $qty = (int)$item['qty'];
                 
-                // Load product to get SKU and name
-                $product = $this->productRepository->getById($productId);
+                $product = $products[$productId];
                 
                 $itemData = [
                     'request_id' => $requestId,
