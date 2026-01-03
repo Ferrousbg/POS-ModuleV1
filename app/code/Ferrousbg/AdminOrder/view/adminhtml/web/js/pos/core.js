@@ -219,39 +219,29 @@ define([
                         this.loading = false;
                         this.placingOrder = false;
                         if(d.success) {
-                            if (this.submitMode === 'request') {
-                                if (typeof this.notify === 'function') {
-                                    this.notify('✅ Request #' + d.request_id + ' submitted successfully!', 'success');
-                                } else {
-                                    alert('✅ Request #' + d.request_id + ' submitted successfully!');
-                                }
-                            } else {
-                                if (typeof this.notify === 'function') {
-                                    this.notify('✅ Order #' + d.order_increment_id + ' Created!', 'success');
-                                } else {
-                                    alert('✅ Order #' + d.order_increment_id + ' Created!');
-                                }
-                            }
+                            const message = this.submitMode === 'request' 
+                                ? '✅ Request #' + d.request_id + ' submitted successfully!'
+                                : '✅ Order #' + d.order_increment_id + ' Created!';
+                            this._showNotification(message, 'success');
                             this.cart = [];
                             this.grandTotal = 0;
-                            // Reset state
                             if(this.resetCustomer) this.resetCustomer();
                         } else {
-                            if (typeof this.notify === 'function') {
-                                this.notify('❌ Error: ' + d.message, 'error');
-                            } else {
-                                alert('❌ Error: ' + d.message);
-                            }
+                            this._showNotification('❌ Error: ' + d.message, 'error');
                         }
                     }).catch((e) => {
                     this.loading = false;
                     this.placingOrder = false;
-                    if (typeof this.notify === 'function') {
-                        this.notify('Server Error', 'error');
-                    } else {
-                        alert('Server Error');
-                    }
+                    this._showNotification('Server Error', 'error');
                 });
+            },
+
+            _showNotification(message, type) {
+                if (typeof this.notify === 'function') {
+                    this.notify(message, type);
+                } else {
+                    alert(message);
+                }
             }
         };
     };

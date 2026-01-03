@@ -124,9 +124,6 @@ define([
                                 foundDefaultBilling = addr.id;
                             }
 
-                            // Don't filter out billing-only addresses - keep them all
-                            // if (isDefBilling && !isDefShipping) return null;
-
                             // 1. Извличане на данни
                             let fullString = Array.isArray(addr.street) ? addr.street.join(' ') : (addr.street || '');
                             let cleanStreet = fullString;
