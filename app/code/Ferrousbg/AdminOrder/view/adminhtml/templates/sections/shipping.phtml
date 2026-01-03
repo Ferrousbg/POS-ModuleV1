@@ -1,5 +1,32 @@
 <?php /** @var \Magento\Backend\Block\Template $block */ ?>
 
+<!-- BILLING ADDRESS PANEL (NEW) -->
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm w-full relative mb-6 transition-all duration-200">
+    <!-- HEADER ROW -->
+    <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-2xl">
+        <div class="flex items-center gap-3">
+            <span class="text-2xl drop-shadow-sm">🧾</span>
+            <h3 class="text-lg font-black text-slate-800 tracking-tight uppercase">
+                <?= $block->escapeHtml(__('Billing Address')) ?>
+            </h3>
+        </div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="p-5">
+        <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1">Select Billing Address</label>
+            <select x-model="billingAddressId" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-base font-bold text-slate-700 focus:border-blue-400 outline-none transition-colors bg-white">
+                <option value="">Auto (Default Billing)</option>
+                <template x-for="addr in savedAddresses" :key="addr.id">
+                    <option :value="addr.id" x-text="addr.city + ' - ' + addr.street.replace('[OFFICE]', '').replace('Офис Еконт:', '').trim()"></option>
+                </template>
+            </select>
+            <p class="text-xs text-slate-500 mt-2 ml-1">If not selected, customer's default billing address will be used</p>
+        </div>
+    </div>
+</div>
+
 <!-- SHIPPING PANEL WRAPPER -->
 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm w-full relative mb-6 transition-all duration-200">
 

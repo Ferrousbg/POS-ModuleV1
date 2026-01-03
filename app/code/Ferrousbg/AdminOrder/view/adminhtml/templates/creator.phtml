@@ -82,6 +82,7 @@ foreach ($storesIds as $sid) {
 $config = [
     'searchUrl' => $block->getUrl('adminorder/order/search'),
     'createUrl' => $block->getUrl('adminorder/order/create'),
+    'createRequestUrl' => $block->getUrl('adminorder/request/create'),
     'customerSearchUrl' => $block->getUrl('adminorder/customer/search'),
     'shareUrl' => $block->getUrl('adminorder/order/share'),
     'productsUrl' => $block->getUrl('ferrousbg_pos/api/products'),
@@ -236,6 +237,8 @@ $config = [
         // --- Selections ---
         selectedProduct: null,
         selectedShippingMethod: window.POS_CONFIG.defaultShippingMethod || '',
+        billingAddressId: null,
+        submitMode: 'request',
 
         // --- MODALS ---
         productModalOpen: false,

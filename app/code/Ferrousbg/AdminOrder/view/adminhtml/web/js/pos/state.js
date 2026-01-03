@@ -45,6 +45,8 @@ define([], function () {
             },
             savedAddresses: [],
             saveAsDefault: false,
+            billingAddressId: null,
+            submitMode: 'request',
 
             backupAddress: null,
             isShippingEdit: false,

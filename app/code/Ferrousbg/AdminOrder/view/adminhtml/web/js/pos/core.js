@@ -142,10 +142,35 @@ define([
 
             placeOrder() {
                 if (!this.isValidOrder) return;
+                
+                // Validate billing address for requests
+                if (this.submitMode === 'request') {
+                    let billingId = this.billingAddressId;
+                    
+                    // If no explicit billing address, try to get default
+                    if (!billingId && this.customer && this.customer.default_billing) {
+                        billingId = this.customer.default_billing;
+                    }
+                    
+                    if (!billingId) {
+                        if (typeof this.notify === 'function') {
+                            this.notify('No billing address found. Please select a billing address.', 'error');
+                        } else {
+                            alert('❌ No billing address found. Please select a billing address.');
+                        }
+                        return;
+                    }
+                }
+                
+                let title = this.submitMode === 'request' ? 'Submit Request?' : 'Create Order?';
+                let message = this.submitMode === 'request' 
+                    ? 'Are you sure you want to submit this request?' 
+                    : 'Are you sure you want to finalize this order?';
+                
                 this.confirmModal = {
                     open: true,
-                    title: 'Create Order?',
-                    message: 'Are you sure you want to finalize this order?'
+                    title: title,
+                    message: message
                 };
                 this.pendingAction = () => { this._executePlaceOrder(); };
             },
@@ -169,13 +194,22 @@ define([
                     is_company: this.isCompany,
                     company_data: this.isCompany ? this.company : null,
                     shipping_method: this.selectedShippingMethod,
-                    payment_method: this.selectedPaymentMethod, // <--- ИЗПРАЩАНЕ НА ПЛАЩАНЕТО
+                    payment_method: this.selectedPaymentMethod,
                     address: this.address,
                     items: this.cart.map(i => ({ id: i.id, qty: i.qty })),
                     form_key: this.urls.formKey
                 };
 
-                fetch(this.urls.createUrl, {
+                // Add billing address for requests
+                if (this.submitMode === 'request') {
+                    payload.billing_address_id = this.billingAddressId || (this.customer && this.customer.default_billing);
+                    payload.shipping_address_id = this.address.id || null;
+                }
+
+                // Choose URL based on mode
+                const url = this.submitMode === 'request' ? this.urls.createRequestUrl : this.urls.createUrl;
+
+                fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     body: JSON.stringify(payload)
@@ -185,19 +219,38 @@ define([
                         this.loading = false;
                         this.placingOrder = false;
                         if(d.success) {
-                            // Успех
-                            alert('✅ Order #' + d.order_increment_id + ' Created!');
+                            if (this.submitMode === 'request') {
+                                if (typeof this.notify === 'function') {
+                                    this.notify('✅ Request #' + d.request_id + ' submitted successfully!', 'success');
+                                } else {
+                                    alert('✅ Request #' + d.request_id + ' submitted successfully!');
+                                }
+                            } else {
+                                if (typeof this.notify === 'function') {
+                                    this.notify('✅ Order #' + d.order_increment_id + ' Created!', 'success');
+                                } else {
+                                    alert('✅ Order #' + d.order_increment_id + ' Created!');
+                                }
+                            }
                             this.cart = [];
                             this.grandTotal = 0;
                             // Reset state
                             if(this.resetCustomer) this.resetCustomer();
                         } else {
-                            alert('❌ Error: ' + d.message);
+                            if (typeof this.notify === 'function') {
+                                this.notify('❌ Error: ' + d.message, 'error');
+                            } else {
+                                alert('❌ Error: ' + d.message);
+                            }
                         }
                     }).catch((e) => {
                     this.loading = false;
                     this.placingOrder = false;
-                    alert('Server Error');
+                    if (typeof this.notify === 'function') {
+                        this.notify('Server Error', 'error');
+                    } else {
+                        alert('Server Error');
+                    }
                 });
             }
         };
