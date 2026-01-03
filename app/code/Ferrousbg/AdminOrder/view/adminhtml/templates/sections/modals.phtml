@@ -1,0 +1,221 @@
+<!-- PRODUCT MODAL (Orange Theme) -->
+<div x-cloak x-show="productModalOpen"
+     class="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm"
+     @click.self="productModalOpen = false">
+
+    <div class="bg-white rounded-2xl shadow-2xl w-[900px] max-w-[95vw] max-h-[90vh] overflow-hidden flex flex-col border-4 border-orange-500">
+
+        <!-- Header -->
+        <div class="bg-orange-500 px-6 py-4 border-b border-orange-600 flex justify-between items-center text-white">
+            <h3 class="text-2xl font-black uppercase tracking-wide">Product Details</h3>
+            <button @click="productModalOpen = false" class="text-3xl font-bold hover:text-orange-200 transition">&times;</button>
+        </div>
+
+        <!-- Body -->
+        <div class="p-8 flex-grow overflow-auto">
+            <h2 x-text="selectedProduct?.name" class="text-3xl font-black text-slate-800 mb-6"></h2>
+
+            <div class="flex items-center gap-4 mb-8">
+                <div class="text-4xl font-black text-orange-600" x-text="formatPrice(selectedProduct?.price)"></div>
+                <div class="bg-orange-100 text-orange-700 px-3 py-1 rounded-lg font-bold text-sm" x-text="'SKU: ' + selectedProduct?.sku"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-slate-600 text-lg mb-8">
+                <div><strong>Stock:</strong> <span x-text="selectedProduct?.qty_available"></span></div>
+            </div>
+
+            <!-- Add to Cart Button -->
+            <button @click="addToCart(selectedProduct); productModalOpen = false"
+                    class="bg-orange-600 hover:bg-orange-700 text-white w-full py-5 font-black text-2xl rounded-xl shadow-lg shadow-orange-500/30 transition transform active:scale-[0.98]">
+                ADD TO CART
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- CUSTOMER SEARCH MODAL (Orange Theme - Backup if needed) -->
+<div x-cloak x-show="customerModalOpen"
+     class="fixed inset-0 z-[110] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm"
+     @click.self="customerModalOpen = false">
+
+    <div class="bg-white rounded-2xl shadow-2xl w-[800px] max-w-[95vw] max-h-[85vh] flex flex-col border border-orange-200">
+
+        <!-- Header -->
+        <div class="p-5 border-b border-orange-100 bg-orange-50 rounded-t-2xl flex justify-between items-center">
+            <h3 class="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
+                <span class="text-orange-500">🔍</span> Find Customer
+            </h3>
+            <button @click="customerModalOpen = false" class="text-2xl text-slate-400 hover:text-orange-500">&times;</button>
+        </div>
+
+        <!-- Search Input -->
+        <div class="p-4 bg-white border-b border-slate-100">
+            <input type="text"
+                   x-model="customerSearchQuery"
+                   @input.debounce.300ms="searchCustomers()"
+                   x-ref="customerSearchInput"
+                   placeholder="Search by Name, Email or Phone..."
+                   class="w-full border-2 border-slate-200 p-4 rounded-xl text-lg font-bold focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all">
+        </div>
+
+        <!-- Results -->
+        <div class="flex-grow overflow-y-auto p-4 bg-slate-50 custom-scroll">
+            <template x-for="c in customerResults" :key="c.id">
+                <div @click="selectCustomer(c); customerModalOpen = false"
+                     class="bg-white border border-slate-200 p-4 rounded-xl mb-2 hover:border-orange-500 hover:shadow-md cursor-pointer flex justify-between items-center group transition-all">
+
+                    <div>
+                        <div class="font-bold text-lg text-slate-800 group-hover:text-orange-700" x-text="c.firstname + ' ' + c.lastname"></div>
+                        <div class="text-sm text-slate-500" x-text="c.email"></div>
+                    </div>
+
+                    <button class="bg-slate-100 text-slate-600 group-hover:bg-orange-500 group-hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+                        Select
+                    </button>
+                </div>
+            </template>
+
+            <div x-show="customerResults.length === 0" class="text-center py-12 text-slate-400">
+                <div class="text-4xl mb-2 opacity-30">📂</div>
+                No results found
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ... (другите съществуващи модали: Product Modal, Customer Search Modal и т.н.) ... -->
+<!-- CUSTOMER HISTORY MODAL -->
+<!-- Извиква се чрез: historyModalOpen = true -->
+<div x-cloak x-show="historyModalOpen"
+     style="display: none;"
+     class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4"
+     x-transition.opacity
+     @click.self="historyModalOpen = false">
+
+    <!-- ПРОМЯНА: Сменихме max-w-5xl на max-w-7xl (много широк) и добавихме w-full -->
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+
+        <!-- Header -->
+        <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+            <div class="flex items-center gap-4">
+                <span class="text-4xl bg-indigo-50 text-indigo-600 p-3 rounded-2xl">📂</span>
+                <div>
+                    <h3 class="text-3xl font-black text-slate-800 uppercase tracking-tight">История на клиента</h3>
+                    <!-- Показваме името на клиента -->
+                    <div class="text-lg font-bold text-slate-400 mt-1" x-text="customer ? (customer.firstname + ' ' + customer.lastname) : '...'"></div>
+                </div>
+            </div>
+            <button @click="historyModalOpen = false" class="bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-500 w-12 h-12 rounded-xl font-black text-2xl transition-colors flex items-center justify-center">&times;</button>
+        </div>
+
+        <!-- TABS NAVIGATION -->
+        <div class="flex border-b-2 border-slate-100 bg-slate-50 shrink-0">
+            <button @click="historyTab = 'orders'"
+                    class="flex-1 py-6 text-xl font-black uppercase tracking-wide transition-all border-b-4"
+                    :class="historyTab === 'orders' ? 'border-orange-500 text-orange-600 bg-white shadow-sm' : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-100'">
+                🛒 Поръчки (<span x-text="customerHistoryOrders ? customerHistoryOrders.length : 0"></span>)
+            </button>
+            <button @click="historyTab = 'requests'"
+                    class="flex-1 py-6 text-xl font-black uppercase tracking-wide transition-all border-b-4"
+                    :class="historyTab === 'requests' ? 'border-blue-500 text-blue-600 bg-white shadow-sm' : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-100'">
+                🏭 Заявки (<span x-text="customerHistoryRequests ? customerHistoryRequests.length : 0"></span>)
+            </button>
+        </div>
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-y-auto p-10 bg-slate-50 custom-scroll">
+
+            <!-- Loader -->
+            <div x-show="isLoadingHistory" class="flex flex-col justify-center items-center h-full text-slate-400 gap-6">
+                <svg class="animate-spin h-16 w-16 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="font-bold uppercase tracking-widest text-lg">Зареждане на данни...</span>
+            </div>
+
+            <!-- TAB 1: ORDERS -->
+            <div x-show="!isLoadingHistory && historyTab === 'orders'">
+                <template x-if="!customerHistoryOrders || customerHistoryOrders.length === 0">
+                    <div class="text-center py-20 opacity-50">
+                        <div class="text-8xl mb-6">🛒</div>
+                        <div class="text-2xl font-black text-slate-400 uppercase">Няма намерени поръчки</div>
+                    </div>
+                </template>
+
+                <!-- Grid за поръчките (по 2 на ред заради ширината) -->
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <template x-for="order in customerHistoryOrders" :key="order.id">
+                        <div class="bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm flex justify-between items-center hover:shadow-md transition-all hover:border-orange-300 group cursor-default">
+                            <div class="flex items-center gap-5">
+                                <div class="bg-orange-50 text-orange-600 font-black text-xl w-20 h-20 rounded-2xl flex items-center justify-center border-2 border-orange-100">
+                                    <div class="text-center">
+                                        <span class="text-[10px] text-orange-300 block uppercase tracking-wider mb-0.5">ORD</span>
+                                        <span x-text="order.increment_id ? order.increment_id.slice(-4) : '...'"></span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="font-black text-slate-800 text-xl mb-1">Поръчка #<span x-text="order.increment_id"></span></div>
+                                    <div class="text-sm font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+                                        <span>📅 <span x-text="order.date"></span></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right flex flex-col items-end gap-2">
+                                <div class="font-black text-3xl text-slate-800 tracking-tight" x-text="order.total"></div>
+                                <span class="inline-block px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide"
+                                      :class="order.status === 'Complete' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'"
+                                      x-text="order.status"></span>
+                                <a :href="order.view_url" target="_blank" class="text-xs font-bold text-indigo-500 hover:text-indigo-700 hover:underline uppercase tracking-wide mt-1 flex items-center gap-1">
+                                    Преглед ↗
+                                </a>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- TAB 2: REQUESTS -->
+            <div x-show="!isLoadingHistory && historyTab === 'requests'">
+                <template x-if="!customerHistoryRequests || customerHistoryRequests.length === 0">
+                    <div class="text-center py-20 opacity-50">
+                        <div class="text-8xl mb-6">🏭</div>
+                        <div class="text-2xl font-black text-slate-400 uppercase">Няма производствени заявки</div>
+                    </div>
+                </template>
+
+                <!-- Grid за заявките -->
+                <div class="grid grid-cols-1 gap-5">
+                    <template x-for="req in customerHistoryRequests" :key="req.id">
+                        <div class="bg-white p-8 rounded-3xl border-2 border-slate-100 shadow-sm hover:shadow-lg transition-all hover:border-blue-300 group">
+                            <div class="flex justify-between items-start mb-6 border-b border-slate-100 pb-5">
+                                <div class="flex items-center gap-4">
+                                    <span class="bg-blue-600 text-white px-4 py-2 rounded-xl text-lg font-black uppercase tracking-wide shadow-blue-200 shadow-lg">REQ #<span x-text="req.id"></span></span>
+                                    <span class="text-base font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+                                        🕒 <span x-text="req.date"></span>
+                                    </span>
+                                </div>
+                                <span class="px-5 py-2 rounded-xl text-sm font-black uppercase tracking-wider"
+                                      :class="req.status === 'Sent To Production' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600'"
+                                      x-text="req.status"></span>
+                            </div>
+
+                            <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                                <div class="text-xs font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2">
+                                    <span>📦</span> Продукти в заявката
+                                </div>
+                                <div class="font-bold text-slate-700 text-lg leading-relaxed" x-text="req.items"></div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-8 border-t border-slate-100 bg-white flex justify-end">
+            <button @click="historyModalOpen = false" class="bg-slate-800 hover:bg-slate-900 text-white font-black py-4 px-12 rounded-2xl text-lg uppercase tracking-wider transition-transform active:scale-95 shadow-xl shadow-slate-300">
+                Затвори
+            </button>
+        </div>
+    </div>
+</div>

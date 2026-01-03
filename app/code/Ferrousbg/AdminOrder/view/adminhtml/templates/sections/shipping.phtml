@@ -1,0 +1,332 @@
+<?php /** @var \Magento\Backend\Block\Template $block */ ?>
+
+<!-- SHIPPING PANEL WRAPPER -->
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm w-full relative mb-6 transition-all duration-200">
+
+    <!-- 1. HEADER ROW -->
+    <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-2xl">
+        <div class="flex items-center gap-3">
+            <span class="text-2xl drop-shadow-sm">🚚</span>
+            <h3 class="text-lg font-black text-slate-800 tracking-tight uppercase">
+                <?= $block->escapeHtml(__('Shipping')) ?>
+            </h3>
+        </div>
+
+        <button @click="isShippingEdit = !isShippingEdit"
+                class="text-xs font-bold px-3 py-1.5 rounded-lg transition-colors border flex items-center gap-2 uppercase tracking-wide"
+                :class="isShippingEdit ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100' : 'bg-white text-slate-500 border-slate-200 hover:text-slate-700'">
+            <span x-text="isShippingEdit ? 'Затвори' : 'Промени'"></span>
+            <span class="text-lg leading-none" x-text="isShippingEdit ? '×' : '✎'"></span>
+        </button>
+    </div>
+
+    <!-- 2. CONTENT AREA -->
+    <div class="p-5">
+
+        <!-- A. SUMMARY VIEW (СЕЛЕКТИРАНИЯТ АДРЕС - ГОЛЯМ И ЧЕТЛИВ) -->
+        <div x-show="!isShippingEdit" class="animate-fade-in" @click="isShippingEdit = true">
+
+            <div class="flex items-start gap-4 p-4 rounded-2xl border border-slate-200 bg-white shadow-sm hover:border-orange-300 hover:shadow-md transition-all cursor-pointer group">
+
+                <!-- ГОЛЯМА ИКОНА -->
+                <div class="bg-orange-50 w-14 h-14 rounded-xl text-orange-500 border border-orange-100 shrink-0 flex items-center justify-center text-3xl">
+                    <span x-show="address.street && (address.street.includes('Офис') || address.street.includes('[OFFICE]'))">🏢</span>
+                    <span x-show="!address.street || (!address.street.includes('Офис') && !address.street.includes('[OFFICE]'))">🏠</span>
+                </div>
+
+                <div class="flex-1 min-w-0 pt-0.5">
+                    <!-- Заглавие на метода -->
+                    <div class="flex justify-between items-center mb-1">
+                        <div class="font-bold text-xs text-slate-400 uppercase tracking-widest">
+                            <span x-text="availableShippingMethods.find(m => m.code === selectedShippingMethod)?.title || '<?= $block->escapeJs(__('Няма избран метод')) ?>'"></span>
+                        </div>
+                        <div class="text-xs text-orange-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                            НАТИСНИ ЗА ПРОМЯНА
+                        </div>
+                    </div>
+
+                    <!-- ГРАД (Много голям) -->
+                    <div x-show="address.city" class="text-2xl font-black text-slate-800 leading-none mb-1.5"
+                         x-text="address.city"></div>
+
+                    <!-- УЛИЦА (Голяма) -->
+                    <div class="text-base font-bold text-slate-600 leading-tight"
+                         x-text="address.street ? address.street.replace('[OFFICE]', '').replace('Офис Еконт:', '').trim() : '<?= $block->escapeJs(__('Няма въведен адрес')) ?>'">
+                    </div>
+
+                    <!-- Бележка (ако има) -->
+                    <div x-show="address.note" class="mt-2 inline-flex items-center gap-1 bg-slate-50 text-slate-500 px-2 py-1 rounded text-xs font-bold border border-slate-100">
+                        <span>📝</span>
+                        <span x-text="address.note"></span>
+                    </div>
+                </div>
+
+                <!-- Стрелка -->
+                <div class="self-center text-slate-300 group-hover:text-orange-400 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- B. EDIT FORM (Разгънат панел) -->
+        <div x-show="isShippingEdit"
+             class="space-y-6 animate-fade-in-down"
+             x-data="{
+                isLocalOffice() { return this.selectedShippingMethod === 'econt_econt'; },
+                isLocalAddress() { return this.selectedShippingMethod === 'econtaddress_econtaddress'; },
+                showAllMethods: false
+             }"
+             x-init="$watch('isShippingEdit', val => { if(!val && savedAddresses.length > 0) showAllMethods = false; })">
+
+            <!-- B1. ADDRESS BOOK (Запазени адреси) -->
+            <div x-show="savedAddresses && savedAddresses.length > 0">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Запазени Адреси</span>
+                    <span class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full" x-text="savedAddresses.length"></span>
+                </div>
+
+                <div class="space-y-3">
+                    <template x-for="addr in savedAddresses" :key="addr.id">
+                        <div class="relative flex items-center justify-between p-4 mb-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:border-blue-400 transition-all cursor-pointer"
+                             @click="applySavedAddress(addr)">
+
+                            <!-- Маркер за избран адрес -->
+                            <div x-show="address.street && (addr._clean_street === address.street || addr.street.includes(address.street))"
+                                 class="absolute left-0 top-3 bottom-3 w-1.5 bg-blue-600 rounded-r-md"></div>
+
+                            <!-- Икона и Текст (УВЕЛИЧЕНИ РАЗМЕРИ) -->
+                            <div class="flex items-center gap-4 overflow-hidden flex-1 pr-2">
+                                <!-- По-голяма икона -->
+                                <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-slate-50 text-slate-500 shrink-0 border border-slate-100">
+                                    <span x-text="(addr.street.includes('Офис') || addr.street.includes('[OFFICE]') || addr.is_office) ? '🏢' : '🏠'"></span>
+                                </div>
+
+                                <div class="min-w-0 flex-1">
+                                    <!-- По-голям Град -->
+                                    <div class="text-lg font-black text-slate-800 truncate" x-text="addr.city"></div>
+                                    <!-- По-голяма Улица -->
+                                    <div class="text-sm font-medium text-slate-600 truncate mt-0.5" x-text="addr.street.replace('[OFFICE]', '').replace('Офис Еконт:', '').trim()"></div>
+                                </div>
+                            </div>
+
+                            <!-- БУТОНИ ЗА ДЕЙСТВИЕ (ВИНАГИ ВИДИМИ) -->
+                            <!-- БУТОНИ ЗА ДЕЙСТВИЕ (За PC/Мишка - Винаги видими и цветни) -->
+                            <div class="flex items-center gap-2 pl-3 border-l border-slate-100 ml-2">
+
+                                <!-- 1. БУТОН РЕДАКЦИЯ (Син) -->
+                                <button @click.stop="editSavedAddress(addr)"
+                                        class="p-2 rounded-lg text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-600 hover:text-white hover:shadow-md transition-all group"
+                                        title="Редактирай този адрес">
+                                    <!-- Икона Молив -->
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                </button>
+
+                                <!-- 2. БУТОН ИЗТРИВАНЕ (Червен) -->
+                                <div x-data="{ confirming: false }" class="relative" @click.stop>
+
+                                    <!-- Икона Кошче (Вижда се по подразбиране) -->
+                                    <button x-show="!confirming"
+                                            @click.stop="confirming = true; setTimeout(() => confirming = false, 4000)"
+                                            class="p-2 rounded-lg text-red-600 bg-red-50 border border-red-100 hover:bg-red-600 hover:text-white hover:shadow-md transition-all"
+                                            title="Изтрий този адрес">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+
+                                    <!-- Бутон за ПОТВЪРЖДЕНИЕ (Появява се при клик) -->
+                                    <button x-show="confirming"
+                                            @click.stop="deleteSavedAddress(addr.id); confirming = false"
+                                            class="px-3 py-2 bg-red-600 text-white text-xs font-bold rounded-lg shadow-lg flex items-center gap-1 hover:bg-red-700 transition-colors animate-fade-in"
+                                            style="display: none;">
+                                        <span>🗑️</span> ИЗТРИЙ?
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <button x-show="!showAllMethods" @click="showAllMethods = true" class="mt-4 w-full py-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl hover:bg-white hover:border-blue-300 hover:text-blue-600 font-bold text-sm transition-colors flex items-center justify-center gap-2 uppercase tracking-wide border-dashed">
+                    <span class="text-lg">+</span> Избери друг метод
+                </button>
+            </div>
+
+            
+            <!-- B2. METHOD SELECTION (Списък с методи) -->
+            <div x-show="showAllMethods || !savedAddresses || savedAddresses.length === 0" x-transition.opacity>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Начин на доставка</span>
+                    <button x-show="savedAddresses.length > 0" @click="showAllMethods = false" class="text-xs text-blue-500 hover:underline font-bold">Отказ</button>
+                </div>
+
+                <div class="space-y-3">
+                    <template x-for="m in availableShippingMethods" :key="m.code">
+                        <label class="block relative group">
+
+                            <!-- ВАЖНО: ТУК Е ПРОМЯНАТА -->
+                            <!-- Махнахме "if(savedAddresses.length > 0) showAllMethods = false;" -->
+                            <!-- Сега само маркира метода, без да затваря панела -->
+                            <input type="radio" :name="'shipping_method'" :value="m.code" class="peer sr-only"
+                                   @change="selectMethodManual(m.code)">
+
+                            <div class="p-4 rounded-xl border border-slate-200 bg-white peer-checked:border-orange-500 peer-checked:bg-orange-50/50 peer-checked:ring-2 peer-checked:ring-orange-200 transition-all cursor-pointer flex items-center gap-4 hover:border-orange-300 hover:shadow-sm">
+                                <div class="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-slate-50 text-slate-400 peer-checked:bg-white peer-checked:text-orange-600 transition-colors text-2xl border border-slate-100">
+                                    <span x-show="m.code.includes('econt')">🚚</span>
+                                    <span x-show="!m.code.includes('econt')">📦</span>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-black text-slate-800 text-base" x-text="m.title"></div>
+                                    <div class="text-xs text-slate-500 font-bold uppercase mt-1">
+                                        <span x-show="m.code === 'econt_econt'">До поискване в офис</span>
+                                        <span x-show="m.code === 'econtaddress_econtaddress'">Куриер до врата</span>
+                                        <span x-show="!m.code.includes('econt')">Стандартна доставка</span>
+                                    </div>
+                                </div>
+                                <div class="w-6 h-6 rounded-full border-2 border-slate-300 peer-checked:border-orange-500 peer-checked:bg-orange-500 flex items-center justify-center text-white transition-all">
+                                    <svg class="w-4 h-4 opacity-0 peer-checked:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                </div>
+                            </div>
+                        </label>
+                    </template>
+                </div>
+            </div>
+
+            <!-- B3. OFFICE SELECTION (За офиси) -->
+            <div x-show="isLocalOffice()" class="bg-blue-50/50 border border-blue-100 rounded-xl p-4 animate-fade-in">
+                <div class="flex items-center gap-2 mb-3 text-blue-800 font-bold uppercase text-xs tracking-wide">
+                    <span>🏢</span> Избор на Офис
+                </div>
+
+                <button type="button" @click="openEcontManual()"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-md shadow-blue-200 transition-transform active:scale-95 flex justify-center items-center gap-2 text-base uppercase tracking-wide">
+                    <span class="text-xl">🔎</span> Отвори списък
+                </button>
+
+                <div x-show="address.street && address.street.includes('Офис')" class="mt-4 pt-4 border-t border-blue-100">
+                    <div class="bg-white p-4 rounded-xl border border-blue-200 text-center mb-3 text-base font-bold text-slate-800 shadow-sm" x-text="address.street"></div>
+
+                    <div class="flex items-center justify-between gap-3" x-show="customer.id">
+                        <label class="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-blue-100/50">
+                            <input type="checkbox" x-model="saveAsDefault" class="w-5 h-5 rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                            <span class="text-xs font-bold text-slate-600 uppercase">Запази като основен</span>
+                        </label>
+                        <button @click="saveCurrentOfficeToBook()" class="text-xs font-bold text-blue-600 bg-white border border-blue-200 hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors uppercase">
+                            💾 Запази
+                        </button>
+                    </div>
+
+                    <button @click="isShippingEdit = false" class="w-full mt-3 py-3 bg-slate-800 text-white font-bold rounded-xl text-sm hover:bg-slate-900 transition-colors uppercase tracking-wide">
+                        ✓ Потвърди Офиса
+                    </button>
+                </div>
+            </div>
+
+            <!-- B4. ADDRESS FORM (За личен адрес) -->
+            <div x-show="selectedShippingMethod && !isLocalOffice()" class="space-y-5 pt-2 border-t border-slate-100 animate-fade-in">
+
+                <!-- State: No Address Selected -->
+                <div x-show="!address.city" class="text-center p-8 bg-slate-50 border-2 border-slate-200 border-dashed rounded-xl">
+                    <button type="button" @click="openAddressWizard()"
+                            class="bg-white hover:bg-blue-50 text-blue-600 font-black py-4 px-8 rounded-xl border border-blue-200 hover:border-blue-400 transition-all shadow-sm active:scale-95 flex items-center gap-3 mx-auto text-base uppercase tracking-wide">
+                        <span class="text-2xl">🗺️</span> Намери Град и Улица
+                    </button>
+                    <p class="text-xs text-slate-400 mt-3 font-bold uppercase tracking-wide">Търсене в Еконт номенклатура</p>
+                </div>
+
+                <!-- State: Address Selected -->
+                <div x-show="address.city" class="space-y-4">
+                    <!-- City -->
+                    <div class="relative">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Населено място</label>
+                        <div class="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1.5 pr-2">
+                            <div class="pl-3 flex-1">
+                                <div class="font-black text-slate-800 text-base" x-text="address.city"></div>
+                                <div class="text-xs text-slate-500 font-bold" x-text="'PK: ' + address.postcode"></div>
+                            </div>
+                            <button @click="openAddressWizard()" class="bg-white border border-slate-200 text-slate-500 hover:text-orange-600 hover:border-orange-200 px-4 py-2 rounded-lg text-xs font-bold transition-colors uppercase">Промени</button>
+                        </div>
+                    </div>
+
+                    <!-- Street -->
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Улица / Квартал</label>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="address.street" readonly class="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-base font-bold text-slate-700 cursor-not-allowed">
+                            <button @click="openStreetSelector()" class="w-12 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-orange-500 hover:border-orange-300 transition-colors flex items-center justify-center text-xl" title="Смени улица">🛣️</button>
+                        </div>
+                    </div>
+
+                    <!-- Number/Floor -->
+                    <div>
+                        <label class="block text-[10px] font-bold text-orange-600 uppercase mb-1 ml-1">№ / Блок / Вход</label>
+                        <input type="text" x-model="address.street_number" class="w-full px-4 py-3 bg-white border border-orange-200 rounded-xl text-base font-bold text-slate-800 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 transition-all outline-none" placeholder="напр. № 10, вх. А">
+                    </div>
+
+                    <!-- Note -->
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Бележка</label>
+                        <input type="text" x-model="address.note" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-blue-400 outline-none transition-colors" placeholder="Указания за куриера...">
+                    </div>
+
+                    <!-- Save Actions -->
+                    <div class="pt-2 flex items-center gap-3">
+                        <button @click="saveAddress()" class="flex-1 py-4 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-base transition-colors shadow-sm uppercase tracking-wide">
+                            ✓ Използвай
+                        </button>
+
+                        <button x-show="customer.id" @click="saveCurrentAddressToBook()" class="px-6 py-4 bg-white border border-slate-200 text-blue-600 font-bold rounded-xl text-xs hover:bg-blue-50 transition-colors uppercase tracking-wide flex flex-col items-center justify-center leading-none gap-1" title="Запази за следващ път">
+                            <span>💾</span>
+                            <span>Запази</span>
+                        </button>
+                    </div>
+                    <div x-show="customer.id" class="px-1"><label class="inline-flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-50 rounded-lg w-full"><input type="checkbox" x-model="saveAsDefault" class="w-5 h-5 rounded text-blue-600 border-slate-300 focus:ring-blue-500"><span class="text-xs font-bold text-slate-500 uppercase">Направи основен адрес</span></label></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ============================================== -->
+<!-- UNIVERSAL SEARCH MODAL (Останал без промяна)   -->
+<!-- ============================================== -->
+<div x-show="officeModal && officeModal.open" style="display:none" class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-opacity" x-transition.opacity>
+    <div class="bg-white w-full max-w-2xl h-[80vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+        <!-- Header -->
+        <div class="bg-white px-5 py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-3">
+                <button x-show="officeModal.step !== 'city'" @click="backToCities()" class="text-slate-500 hover:bg-slate-100 p-2 rounded-lg transition-colors font-bold text-lg">← Назад</button>
+                <div>
+                    <h3 class="text-xl font-black text-slate-800" x-text="officeModal.step === 'city' ? 'Избери Град' : (officeModal.step === 'office' ? 'Избери Офис' : 'Избери Улица')"></h3>
+                    <div x-show="officeModal.selectedCity && officeModal.step !== 'city'" class="text-sm text-orange-600 font-bold uppercase" x-text="officeModal.selectedCity"></div>
+                </div>
+            </div>
+            <button @click="closeOfficeModal()" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-500 transition-colors flex items-center justify-center font-bold text-2xl">&times;</button>
+        </div>
+
+        <!-- Search -->
+        <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+            <div class="relative">
+                <span class="absolute left-4 top-3.5 text-slate-400 text-xl">🔍</span>
+                <input type="text" x-model="officeModal.searchQuery" @input.debounce.300ms="onSearchInput()" class="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl font-bold text-lg text-slate-800 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-50 transition-all placeholder-slate-400" placeholder="Търсене...">
+            </div>
+        </div>
+
+        <!-- List -->
+        <div class="flex-1 overflow-y-auto p-3 custom-scroll bg-slate-50">
+            <div x-show="officeModal.loading" class="py-10 text-center text-slate-400"><div class="animate-spin w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-3"></div>Зареждане...</div>
+
+            <div class="grid grid-cols-1 gap-3">
+                <template x-for="item in officeModal.items" :key="item.id || item.code">
+                    <button @click="selectItem(item)" class="text-left bg-white p-4 rounded-xl border border-slate-200 hover:border-orange-400 hover:shadow-md transition-all group">
+                        <div class="font-black text-slate-800 group-hover:text-orange-700 text-base" x-text="item.display_name || item.name"></div>
+                        <div class="flex justify-between mt-1">
+                            <span x-show="item.address" class="text-sm text-slate-500 truncate max-w-[85%] font-medium" x-text="item.address"></span>
+                            <span class="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded font-mono font-bold" x-show="item.code" x-text="item.code"></span>
+                        </div>
+                    </button>
+                </template>
+            </div>
+            <div x-show="!officeModal.loading && (!officeModal.items || officeModal.items.length === 0)" class="py-10 text-center text-slate-400 opacity-60 text-base font-bold">Няма резултати</div>
+        </div>
+    </div>
+</div>

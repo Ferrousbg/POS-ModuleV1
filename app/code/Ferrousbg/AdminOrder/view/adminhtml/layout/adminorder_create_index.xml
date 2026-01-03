@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <!-- Главен контейнер на POS системата -->
+            <block class="Magento\Backend\Block\Template" name="adminorder.creator" template="Ferrousbg_AdminOrder::creator.phtml">
+
+                <!-- Секции -->
+                <block class="Magento\Backend\Block\Template" name="section.products" template="Ferrousbg_AdminOrder::sections/products.phtml"/>
+                <block class="Magento\Backend\Block\Template" name="section.customer" template="Ferrousbg_AdminOrder::sections/customer.phtml"/>
+                <block class="Magento\Backend\Block\Template" name="section.cart" template="Ferrousbg_AdminOrder::sections/cart.phtml"/>
+
+                <!-- Доставка -->
+                <block class="Magento\Backend\Block\Template" name="section.shipping" template="Ferrousbg_AdminOrder::sections/shipping.phtml"/>
+
+                <!-- НОВО: Плащане -->
+                <block class="Magento\Backend\Block\Template" name="section.payment" template="Ferrousbg_AdminOrder::sections/payment.phtml"/>
+
+                <!-- Модални прозорци -->
+                <block class="Magento\Backend\Block\Template" name="section.modals" template="Ferrousbg_AdminOrder::sections/modals.phtml"/>
+
+            </block>
+        </referenceContainer>
+    </body>
+</page>

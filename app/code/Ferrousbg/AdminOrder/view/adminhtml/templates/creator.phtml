@@ -1,0 +1,433 @@
+<?php
+/** @var \Magento\Backend\Block\Template $block */
+
+// 1. PHP SETUP & CONFIGURATION
+$objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+$storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
+$authSession = $objectManager->get('\Magento\Backend\Model\Auth\Session');
+$shippingConfig = $objectManager->get('\Magento\Shipping\Model\Config');
+$scopeConfig = $objectManager->get('\Magento\Framework\App\Config\ScopeConfigInterface');
+
+$currentUsername = $authSession->getUser() ? $authSession->getUser()->getUserName() : '';
+
+// ACCESS CONTROL
+$restrictedAdmins = ['cashier_ferrous' => 1, 'cashier_sofia' => 2, 'ivaadmin' => 3, 'manager' => [1, 3]];
+$userConfig = isset($restrictedAdmins[$currentUsername]) ? $restrictedAdmins[$currentUsername] : null;
+$forcedStoreId = null; $allowedStoreIds = [];
+
+if ($userConfig) {
+    if (is_array($userConfig)) { $allowedStoreIds = $userConfig; $forcedStoreId = null; }
+    else { $forcedStoreId = $userConfig; $allowedStoreIds = [$userConfig]; }
+}
+
+// Stores Data
+$websites = $storeManager->getWebsites();
+$storesData = []; $storesIds = [];
+foreach ($websites as $website) {
+    foreach ($website->getGroups() as $group) {
+        foreach ($group->getStores() as $store) {
+            $sid = (int)$store->getId();
+            if ($forcedStoreId && $sid !== $forcedStoreId) continue;
+            if (!empty($allowedStoreIds) && !in_array($sid, $allowedStoreIds)) continue;
+            $storesData[] = ['id' => $sid, 'code' => $store->getCode(), 'name' => $store->getName(), 'website' => $website->getName()];
+            $storesIds[] = $sid;
+        }
+    }
+}
+$defaultStoreId = $forcedStoreId ?: (!empty($allowedStoreIds) ? $allowedStoreIds[0] : $storeManager->getStore()->getId());
+
+// --- SHIPPING METHODS ---
+$shippingMethodsPerStore = [];
+$allCarriers = $shippingConfig->getAllCarriers();
+foreach ($storesIds as $sid) {
+    $methods = [];
+    foreach ($allCarriers as $carrierCode => $carrierModel) {
+        if ($scopeConfig->getValue('carriers/'.$carrierCode.'/active', \Magento\Store\Model\ScopeInterface::SCOPE_STORE, $sid)) {
+            $carrierTitle = $scopeConfig->getValue('carriers/'.$carrierCode.'/title', \Magento\Store\Model\ScopeInterface::SCOPE_STORE, $sid) ?: ucfirst($carrierCode);
+            $allowedMethods = $carrierModel->getAllowedMethods();
+            if (!empty($allowedMethods)) {
+                foreach ($allowedMethods as $mCode => $mTitle) $methods[] = ['code' => $carrierCode . '_' . $mCode, 'title' => $carrierTitle . ' - ' . ($mTitle ?: $mCode)];
+            } else { $methods[] = ['code' => $carrierCode . '_' . $carrierCode, 'title' => $carrierTitle]; }
+        }
+    }
+    $shippingMethodsPerStore[$sid] = $methods;
+}
+
+// --- PAYMENT METHODS (НОВО) ---
+$paymentConfig = $objectManager->get('\Magento\Payment\Model\Config');
+$paymentMethodsPerStore = [];
+
+foreach ($storesIds as $sid) {
+    $pMethods = [];
+    $allPaymentMethods = $paymentConfig->getActiveMethods($sid);
+    foreach ($allPaymentMethods as $paymentCode => $paymentModel) {
+        $title = $scopeConfig->getValue('payment/'.$paymentCode.'/title', \Magento\Store\Model\ScopeInterface::SCOPE_STORE, $sid);
+
+        // Simple Icon Mapping
+        $icon = '💳';
+        if (strpos($paymentCode, 'cash') !== false) $icon = '💵';
+        if (strpos($paymentCode, 'bank') !== false) $icon = '🏦';
+        if (strpos($paymentCode, 'card') !== false) $icon = '💳';
+
+        $pMethods[] = [
+            'code' => $paymentCode,
+            'title' => $title ?: $paymentCode,
+            'icon' => $icon
+        ];
+    }
+    $paymentMethodsPerStore[$sid] = $pMethods;
+}
+
+// Config passed to JS
+$config = [
+    'searchUrl' => $block->getUrl('adminorder/order/search'),
+    'createUrl' => $block->getUrl('adminorder/order/create'),
+    'customerSearchUrl' => $block->getUrl('adminorder/customer/search'),
+    'shareUrl' => $block->getUrl('adminorder/order/share'),
+    'productsUrl' => $block->getUrl('ferrousbg_pos/api/products'),
+    'customersUrl' => $block->getUrl('ferrousbg_pos/api/customers'),
+    'cartSaveUrl' => $block->getUrl('ferrousbg_pos/api/cartSave'),
+    'orderPlaceUrl' => $block->getUrl('ferrousbg_pos/api/orderPlace'),
+    'econtOfficesUrl' => $block->getUrl('ferrousbg_econt_admin/data/getoffices'),
+    'econtCitiesUrl' => $block->getUrl('ferrousbg_econt_admin/data/getcities'),
+    'econtStreetsUrl' => $block->getUrl('ferrousbg_econt_admin/data/getstreets'),
+    'customerSaveAddressUrl' => $block->getUrl('adminorder/customer/saveAddress'),
+    'customerGetAddressesUrl' => $block->getUrl('adminorder/customer/getAddresses'),
+    'customerDeleteAddressUrl' => $this->getUrl('adminorder/customer/deleteAddress'),
+
+    // НОВО: URL за запис на предпочитан метод за плащане
+    'customerSavePaymentUrl' => $this->getUrl('adminorder/customer/savePayment'),
+    'customerGetPaymentUrl'  => $this->getUrl('adminorder/customer/getPayment'),
+
+    'formKey' => $block->getFormKey(),
+    'stores' => $storesData,
+    'allShippingMethods' => $shippingMethodsPerStore,
+    'allPaymentMethods' => $paymentMethodsPerStore, // <--- НОВО
+    'defaultStoreId' => $defaultStoreId,
+    'storeId' => (int)$block->getRequest()->getParam('store_id', 1),
+    'currencySymbol' => $block->getCurrencySymbol(),
+    'econtShopId' => '8660570',
+    'baseEcontUrl' => 'https://delivery.econt.com/customer_info.php'
+];
+?>
+
+<!-- TAILWIND (Without Configuration Object to use defaults safely) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        corePlugins: { preflight: false },
+        theme: {
+            extend: {
+                colors: {
+                    brand: { 500: '#ea580c', 600: '#c2410c' },
+                },
+                fontSize: {
+                    'xs': '0.8rem', 'sm': '0.925rem', 'base': '1rem', 'lg': '1.125rem', 'xl': '1.25rem'
+                }
+            }
+        }
+    }
+</script>
+
+<style>
+    [x-cloak] { display: none !important; }
+
+    /* HIDE STANDARD MAGENTO UI ELEMENTS */
+    .page-main-actions, .page-title-wrapper, .page-header, .nav-bar, .page-footer, .notices-wrapper { display: none !important; }
+    .admin__data-grid-wrap { padding: 0 !important; }
+    #maincontent, .page-content { padding: 0 !important; margin: 0 !important; }
+
+    /* MAIN POS WRAPPER */
+    .ferrous-pos-wrapper {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        height: calc(100vh - 50px);
+        width: 100%;
+        background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        color: #334155;
+        font-size: 15px;
+    }
+
+    .ferrous-pos-wrapper * { box-sizing: border-box; }
+    .ferrous-pos-wrapper h1, .ferrous-pos-wrapper h2, .ferrous-pos-wrapper h3 { font-weight: 700; margin: 0; }
+    .ferrous-pos-wrapper p { margin: 0; }
+    .ferrous-pos-wrapper input, .ferrous-pos-wrapper select, .ferrous-pos-wrapper textarea {
+        display: block; width: 100%; border: 1px solid #cbd5e1; background-color: white;
+        padding: 10px 12px; border-radius: 6px; font-size: 15px; color: #1e293b;
+    }
+    .ferrous-pos-wrapper input:focus, .ferrous-pos-wrapper select:focus {
+        outline: none; border-color: #ea580c; box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.1);
+    }
+    .ferrous-pos-wrapper button { cursor: pointer; }
+    .ferrous-pos-wrapper ::-webkit-scrollbar { width: 8px; }
+    .ferrous-pos-wrapper ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+</style>
+
+<!-- 1. JS CONFIG -->
+<script>window.POS_CONFIG = <?= json_encode($config) ?>;</script>
+
+<!-- 2. SAFE INITIAL STATE -->
+<script>
+    window.initialPosState = {
+        urls: window.POS_CONFIG,
+        loading: true,
+        currentStoreId: null,
+
+        // --- Data Arrays ---
+        cart: [],
+        searchResults: [],
+        savedAddresses: [],
+        availableShippingMethods: [],
+        availablePaymentMethods: [],
+        customerResults: [],
+        notifications: [],
+
+        // --- Customer Data ---
+        customer: null,
+
+        // --- Shipping Address ---
+        address: { street: '', city: '', postcode: '' },
+
+        // --- Invoice Data ---
+        invoiceData: {
+            wants_invoice: false, company: '', vat_id: '', vat_number: '', city: '', street: '', mol: ''
+        },
+
+        // --- Totals ---
+        totals: { subtotal: 0, tax: 0, discount: 0, grand_total: 0 },
+        grandTotal: 0,
+
+        // --- Boolean Flags (UI State) ---
+        isValidOrder: false,
+        placingOrder: false,
+        isShippingEdit: false,
+        isPaymentEdit: false,
+
+        // --- PAYMENT FLAGS ---
+        showSaveModal: false,
+        modalMessage: '',
+        tempSelectedMethod: null,
+        serverDefaultPayment: null,
+        isLoadingPayment: false,
+        saveAsDefault: false,
+        savePaymentAsDefault: false,
+        showAllMethods: false,
+        selectedPaymentMethod: '',
+
+        // --- 🛑 HISTORY FLAGS (НОВО) ---
+        historyModalOpen: false,     // Отваря ли се модала
+        historyTab: 'orders',        // Активен таб: 'orders' или 'requests'
+        customerHistoryOrders: [],   // Списък поръчки
+        customerHistoryRequests: [], // Списък заявки
+        isLoadingHistory: false,     // Лоудър
+
+        // --- Customer UI Flags ---
+        isNewCustomer: false,
+        isEditingCustomer: false,
+        isCompany: false,
+        customerLoading: false,
+
+        // --- Search Inputs ---
+        searchQuery: '',
+        customerSearchQuery: '',
+
+        // --- Selections ---
+        selectedProduct: null,
+        selectedShippingMethod: window.POS_CONFIG.defaultShippingMethod || '',
+
+        // --- MODALS ---
+        productModalOpen: false,
+        newCustomerModalOpen: false,
+        customerModalOpen: false,
+        invoiceModalOpen: false,
+
+        confirmModal: { open: false, title: '', message: '' },
+        officeModal: { open: false, items: [], rawOffices: [], step: 'city' },
+
+        // --- Notifications ---
+        notify: function(text, type = 'success') {
+            const id = Date.now();
+            let title = type === 'error' ? 'Error' : 'Success';
+            if (!this.notifications) this.notifications = [];
+            this.notifications.push({ id, text, type, title });
+            setTimeout(() => { this.removeNotification(id); }, 3000);
+        },
+        removeNotification: function(id) {
+            if(this.notifications) {
+                this.notifications = this.notifications.filter(n => n.id !== id);
+            }
+        },
+
+        // --- Dummy Functions ---
+        createCustomer: function() {}, searchCustomers: function() {}, resetCustomer: function() {},
+        clearCustomer: function() {}, startNewCustomer: function() {}, openCustomerEdit: function() {},
+        openNewModal: function() {}, toggleModal: function() {}, openEditModal: function() {},
+        cancelEditCustomer: function() {}, selectCustomer: function() {},
+
+        // 🛑 History Dummy (НОВО)
+        fetchCustomerHistory: function() {},
+
+        // Store / General
+        getStoreName: function() { return 'Loading...'; },
+        formatPrice: function(p) { return p; }, requestStoreSwitch: function() {}, closeConfirm: function() {},
+
+        // Products / Order
+        searchProducts: function() {}, placeOrder: function() {}, selectItem: function() {}, onSearchInput: function() {},
+
+        // Shipping / Econt
+        openEcontManual: function() {}, closeOfficeModal: function() {}, isLocalOffice: function() { return false; },
+        saveCurrentOfficeToBook: function() {}, backToCities: function() {},
+
+        // Address
+        saveCustomerOnly: function() {}, editSavedAddress: function() {}, deleteSavedAddress: function() {},
+        applySavedAddress: function() {}, saveCurrentAddressToBook: function() {}, openAddressWizard: function() {},
+        openStreetSelector: function() {}, saveAddress: function() {}, isLocalAddress: function() { return false; },
+
+        // Payment Logic
+        initPaymentModule: function() {},
+        selectPayment: function() {},
+        onUserSelectPayment: function() {},
+        updatePaymentMethods: function() {},
+        getSelectedMethodTitle: function() { return '...'; },
+        getSelectedMethodIcon: function() { return '💳'; },
+        applyCustomerDefaultPayment: function() {},
+        saveDefaultPaymentToBackend: function() {},
+        fetchDefaultPaymentFromServer: function() {},
+
+        // Payment Modal Actions
+        confirmSaveDefault: function() {},
+        declineSaveDefault: function() {},
+        closeModal: function() { this.showSaveModal = false; }
+    };
+</script>
+
+<!-- MAIN APP -->
+<div id="pos-app" class="ferrous-pos-wrapper" x-data="window.initialPosState" x-cloak>
+
+    <!-- HEADER -->
+    <div class="bg-slate-800 text-white px-5 py-3 flex justify-between h-16 shrink-0 z-30 shadow-md items-center border-b border-slate-700">
+        <h1 class="text-xl font-bold m-0 text-white flex items-center gap-2">
+            <span class="text-brand-500 text-2xl">⚡</span><span>Flash POS</span>
+        </h1>
+        <!-- STORE SELECTOR -->
+        <div class="flex items-center" x-data="{ open: false }">
+            <template x-if="urls && (urls.isStoreLocked || (urls.stores && urls.stores.length <= 1))">
+                <div class="bg-slate-700 px-4 py-2 rounded-lg border border-slate-600 text-sm font-medium text-slate-300 flex items-center gap-2">
+                    <span class="text-xs">🔒</span><span x-text="getStoreName(currentStoreId)"></span>
+                </div>
+            </template>
+            <template x-if="urls && !urls.isStoreLocked && urls.stores && urls.stores.length > 1">
+                <div class="relative">
+                    <button @click="open = !open" @click.outside="open = false" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-medium text-white border border-slate-500 flex items-center gap-2">
+                        <span x-text="getStoreName(currentStoreId)"></span>
+                        <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div x-show="open" style="display: none;" class="absolute right-0 top-full mt-2 w-64 bg-white text-slate-800 shadow-xl border border-slate-200 rounded-lg z-50 overflow-hidden py-1">
+                        <template x-for="store in urls.stores" :key="store.id">
+                            <button @click="requestStoreSwitch(store.id); open = false" class="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center justify-between border-b border-slate-100 last:border-0 text-sm">
+                                <span class="font-medium" x-text="store.name"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- MAIN LAYOUT -->
+    <div class="flex flex-1 overflow-hidden relative h-[calc(100vh-64px)]">
+
+        <!-- ЛЯВА КОЛОНА (Продукти и Количка) -->
+        <div class="flex-1 flex flex-col min-w-0 bg-slate-50 relative z-0">
+            <div class="p-4 flex-shrink-0 z-20">
+                <?= $block->getChildHtml('section.products') ?>
+            </div>
+            <div class="flex-1 px-4 pb-4 overflow-hidden flex flex-col z-10">
+                <div class="bg-white rounded-lg border border-slate-300 h-full flex flex-col shadow-sm overflow-hidden">
+                    <?= $block->getChildHtml('section.cart') ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- ДЯСНА КОЛОНА (Клиент, Доставка, Плащане) -->
+        <div class="w-[500px] bg-white shadow-2xl flex flex-col z-20 border-l border-slate-300 h-full relative">
+
+            <!-- Единствен контейнер за скролване -->
+            <div class="flex-1 overflow-y-auto custom-scroll">
+
+                <!-- 1. Секция Клиент -->
+                <div class="relative z-20">
+                    <?= $block->getChildHtml('section.customer') ?>
+                </div>
+
+                <!-- 2. Секция Доставка и Плащане -->
+                <div class="p-6 bg-slate-50 min-h-[300px] border-t border-slate-200">
+
+                    <!-- Ако има клиент -->
+                    <div x-show="customer && (customer.id || isNewCustomer)"
+                         x-transition:enter="transition ease-out duration-300"
+                         x-transition:enter-start="opacity-0 translate-y-4"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="space-y-6"> <!-- Added space-y-6 for separation -->
+
+                        <?= $block->getChildHtml('section.shipping') ?>
+
+                        <!-- НОВО: Плащане се показва само ако е избран метод за доставка -->
+                        <div x-show="selectedShippingMethod">
+                            <?= $block->getChildHtml('section.payment') ?>
+                        </div>
+                    </div>
+
+                    <!-- Ако НЯМА клиент (Empty State) -->
+                    <div x-show="(!customer || !customer.id) && !isNewCustomer" class="text-center py-10 opacity-50">
+                        <div class="text-4xl mb-4">👆</div>
+                        <p class="font-bold text-slate-400 uppercase text-sm">Изберете клиент отгоре,<br>за да продължите.</p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <?= $block->getChildHtml('section.modals') ?>
+
+    <!-- NOTIFICATIONS -->
+    <div class="fixed top-20 right-4 z-[10000] flex flex-col gap-2 pointer-events-none">
+        <template x-for="msg in notifications" :key="msg.id">
+            <div class="pointer-events-auto w-80 p-4 rounded-lg shadow-lg border-l-4 transform transition-all duration-300 flex items-start gap-3 bg-white"
+                 x-transition:enter="translate-x-full opacity-0" x-transition:enter-end="translate-x-0 opacity-100" x-transition:leave="translate-x-full opacity-0"
+                 :class="{ 'border-green-500': msg.type === 'success', 'border-red-500': msg.type === 'error', 'border-blue-500': msg.type === 'info' }">
+                <div class="shrink-0 text-xl pt-0.5">
+                    <span x-show="msg.type === 'success'">✅</span>
+                    <span x-show="msg.type === 'error'">❌</span>
+                    <span x-show="msg.type === 'info'">ℹ️</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h4 class="font-bold text-sm uppercase text-slate-700" x-text="msg.title"></h4>
+                    <p class="text-base text-slate-600 mt-1 leading-snug break-words" x-text="msg.text"></p>
+                </div>
+                <button @click="removeNotification(msg.id)" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+        </template>
+    </div>
+</div>
+
+<!-- JS BOOTSTRAP -->
+<script>
+    require(['Alpine', 'Ferrousbg_AdminOrder/js/pos/core', 'domReady!'], function(AlpineModule, posCore) {
+        var Alpine = AlpineModule || window.Alpine;
+        if (!Alpine) return;
+        var app = document.getElementById('pos-app');
+        if (app && app._x_dataStack) {
+            console.log("🔄 POS Init...");
+            var originalNotify = window.initialPosState.notify;
+            var scope = Alpine.$data(app);
+            Object.assign(scope, posCore(window.POS_CONFIG));
+            if (typeof scope.notify !== 'function') scope.notify = originalNotify;
+            if (scope.initPOS) scope.initPOS();
+        }
+    });
+</script>

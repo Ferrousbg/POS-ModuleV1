@@ -1,0 +1,64 @@
+<?php
+/**
+ * Clean Econt Button Logic for POS Module
+ * Извличаме само URL-а и логиката, без да зареждаме целия layout на Anowave.
+ */
+
+$econtUrl = '';
+$hasEcont = false;
+
+try {
+    // Опитваме се да създадем блока на Anowave, за да ползваме логиката му
+    $econtBlock = $block->getLayout()->createBlock(\Anowave\Econt\Block\Adminhtml\Order\View\OrderEcontButton::class);
+
+    if ($econtBlock) {
+        // Взимаме URL-а за popup прозореца.
+        // Ако методът getMapUrl() не съществува в тяхната версия, ползваме стандартния път.
+        $econtUrl = $block->getUrl('econt/order/map', ['_current' => false]);
+        $hasEcont = true;
+    }
+} catch (\Exception $e) {
+    // Модулът липсва или гърми
+    $hasEcont = false;
+}
+?>
+
+<?php if ($hasEcont): ?>
+    <!-- Скрит input, за да може JS-ът на POS модула да чете URL-а лесно -->
+    <input type="hidden" id="ferrous_pos_econt_url" value="<?= $block->escapeUrl($econtUrl) ?>" />
+
+    <!-- JS Логика за отваряне на прозореца -->
+    <script>
+        window.openEcontMap = function() {
+            var url = document.getElementById('ferrous_pos_econt_url').value;
+
+            if (!url) {
+                alert('Грешка: URL адресът на Еконт не е намерен.');
+                return;
+            }
+
+            var width = 980;
+            var height = 750;
+            var left = (screen.width - width) / 2;
+            var top = (screen.height - height) / 2;
+
+            // Отваряме прозореца
+            var econtWin = window.open(
+                url,
+                'EcontMap',
+                'width=' + width + ',height=' + height + ',top=' + top + ',left=' + left + ',resizable=yes,scrollbars=yes'
+            );
+
+            if (econtWin) {
+                econtWin.focus();
+            }
+        };
+    </script>
+<?php else: ?>
+    <script>
+        console.warn('Econt module not found or failed to load block.');
+        window.openEcontMap = function() {
+            alert('Econt модулът не е открит.');
+        }
+    </script>
+<?php endif; ?>
